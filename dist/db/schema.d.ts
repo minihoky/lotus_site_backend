@@ -1,0 +1,32 @@
+import type { Property } from "../types/property.js";
+export type PropertyRow = {
+    slug: string;
+    title: string;
+    location: string;
+    address: string;
+    badge: string | null;
+    image: string;
+    gallery: string;
+    beds: number;
+    baths: number;
+    parking: number;
+    area: number;
+    price: string;
+    price_value: number;
+    description: string;
+    features: string;
+    created_at: string;
+};
+export type InquiryRow = {
+    id: number;
+    property_slug: string | null;
+    name: string;
+    phone: string;
+    email: string;
+    message: string | null;
+    created_at: string;
+};
+export declare function rowToProperty(row: PropertyRow): Property;
+export declare const CREATE_PROPERTIES_TABLE = "\n  CREATE TABLE IF NOT EXISTS properties (\n    slug TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    location TEXT NOT NULL,\n    address TEXT NOT NULL,\n    badge TEXT,\n    image TEXT NOT NULL,\n    gallery TEXT NOT NULL,\n    beds INTEGER NOT NULL,\n    baths INTEGER NOT NULL,\n    parking INTEGER NOT NULL,\n    area INTEGER NOT NULL,\n    price TEXT NOT NULL,\n    price_value INTEGER NOT NULL,\n    description TEXT NOT NULL,\n    features TEXT NOT NULL,\n    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n  )\n";
+export declare const MIGRATE_PROPERTIES_CREATED_AT = "\n  ALTER TABLE properties ADD COLUMN created_at TEXT\n";
+export declare const CREATE_INQUIRIES_TABLE = "\n  CREATE TABLE IF NOT EXISTS inquiries (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    property_slug TEXT,\n    name TEXT NOT NULL,\n    phone TEXT NOT NULL,\n    email TEXT NOT NULL,\n    message TEXT,\n    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n  )\n";
