@@ -133,7 +133,7 @@ function parseFeaturesFromBody(body, parking = 0) {
     const raw = body.features;
     if (Array.isArray(raw)) {
         if (raw.length === 0)
-            return [];
+            return defaultFeatures(parking);
         return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
     }
     if (typeof raw !== "string" || !raw.trim()) {
@@ -145,7 +145,7 @@ function parseFeaturesFromBody(body, parking = 0) {
             return defaultFeatures(parking);
         }
         if (parsed.length === 0) {
-            return [];
+            return defaultFeatures(parking);
         }
         return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
     }
