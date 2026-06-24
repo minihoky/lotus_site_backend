@@ -76,10 +76,10 @@ export function listProperties(filters: PropertyFilters = {}): Property[] {
 
   if (filters.q) {
     conditions.push(
-      "(title LIKE ? OR location LIKE ? OR address LIKE ? OR description LIKE ? OR code LIKE ?)",
+      `(LOWER(title) LIKE LOWER(?) OR LOWER(location) LIKE LOWER(?) OR LOWER(address) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?) OR LOWER(COALESCE(code, '')) LIKE LOWER(?) OR LOWER(slug) LIKE LOWER(?) OR LOWER(REPLACE(slug, '-', ' ')) LIKE LOWER(?))`,
     );
     const term = `%${filters.q}%`;
-    params.push(term, term, term, term, term);
+    params.push(term, term, term, term, term, term, term);
   }
 
   if (filters.badge) {
@@ -108,8 +108,12 @@ export function listProperties(filters: PropertyFilters = {}): Property[] {
   }
 
   if (filters.code) {
-    conditions.push("code LIKE ?");
-    params.push(`%${filters.code}%`);
+    const normalizedCode = filters.code.trim().toUpperCase();
+    conditions.push(
+      `(UPPER(COALESCE(code, '')) LIKE ? OR UPPER(REPLACE(slug, '-', '_')) LIKE ?)`,
+    );
+    const term = `%${normalizedCode}%`;
+    params.push(term, term);
   }
 
   if (filters.minBeds !== undefined) {

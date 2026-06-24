@@ -874,6 +874,24 @@ const upsert = db.prepare(`
     description = excluded.description,
     features = excluded.features
 `);
+export function syncPropertySearchMetadata() {
+    const sync = db.prepare(`
+    UPDATE properties SET
+      purpose = ?,
+      property_type = ?,
+      condominium = ?,
+      code = ?
+    WHERE slug = ?
+  `);
+    let updated = 0;
+    for (const [slug, meta] of Object.entries(PROPERTY_META)) {
+        const result = sync.run(meta.purpose, meta.propertyType, meta.condominium ?? null, meta.code, slug);
+        updated += Number(result.changes);
+    }
+    if (updated > 0) {
+        console.log(`Synced search metadata for ${updated} properties.`);
+    }
+}
 export function seedDatabase() {
     for (const p of SEED_PROPERTIES) {
         const meta = PROPERTY_META[p.slug] ?? {

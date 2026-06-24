@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { propertyCount } from "./db/index.js";
-import { seedDatabase } from "./db/seed.js";
+import { seedDatabase, syncPropertySearchMetadata } from "./db/seed.js";
 import { getUploadsDir } from "./lib/uploads.js";
 import { inquiriesRouter } from "./routes/inquiries.js";
 import { notificationsRouter } from "./routes/notifications.js";
@@ -12,6 +12,8 @@ import { propertiesRouter } from "./routes/properties.js";
 
 if (propertyCount() === 0) {
   seedDatabase();
+} else {
+  syncPropertySearchMetadata();
 }
 
 const app = new Hono();
