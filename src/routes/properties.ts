@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { saveUploadedFile } from "../lib/uploads.js";
-import type { PropertyBadge, PropertyFeatureIcon } from "../types/property.js";
+import type { PropertyBadge, PropertyFeatureIcon, PropertyPurpose, PropertyType } from "../types/property.js";
 
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
 
@@ -20,10 +20,34 @@ const featureIconSchema = z.enum([
   "balcony",
 ]);
 
+const purposeSchema = z.enum(["comprar", "alugar"]);
+const propertyTypeSchema = z.enum([
+  "Apartamento",
+  "Casa",
+  "Casa unifamiliar",
+  "Casa em Condomínio",
+  "Sobrado",
+  "Casa de campo",
+  "Casa de campo em condomínio",
+  "Cobertura",
+  "Chácara",
+  "Galpão",
+  "Prédio comercial",
+  "Terreno",
+  "Terreno em Condomínio",
+  "Edifício",
+  "Espaço comercial",
+  "Condomínio",
+]);
+
 const listQuerySchema = z.object({
   q: z.string().optional(),
   badge: badgeSchema.optional(),
   location: z.string().optional(),
+  purpose: purposeSchema.optional(),
+  propertyType: propertyTypeSchema.optional(),
+  condominium: z.string().optional(),
+  code: z.string().optional(),
   minBeds: z.coerce.number().int().min(0).optional(),
   minPrice: z.coerce.number().int().min(0).optional(),
   maxPrice: z.coerce.number().int().min(0).optional(),
@@ -113,6 +137,10 @@ async function parsePropertyMultipart(body: Record<string, unknown>, options?: {
   const descriptionRaw = String(body.description ?? "").trim();
   const priceRaw = String(body.price ?? "").trim();
   const badgeRaw = String(body.badge ?? "").trim();
+  const purposeRaw = String(body.purpose ?? "comprar").trim();
+  const propertyTypeRaw = String(body.propertyType ?? "Apartamento").trim();
+  const condominiumRaw = String(body.condominium ?? "").trim();
+  const codeRaw = String(body.code ?? "").trim();
 
   const beds = Number(body.beds);
   const baths = Number(body.baths);
@@ -159,6 +187,14 @@ async function parsePropertyMultipart(body: Record<string, unknown>, options?: {
       location,
       address,
       badge: badgeSchema.safeParse(badgeRaw).success ? (badgeRaw as PropertyBadge) : undefined,
+      purpose: purposeSchema.safeParse(purposeRaw).success
+        ? (purposeRaw as PropertyPurpose)
+        : "comprar",
+      propertyType: propertyTypeSchema.safeParse(propertyTypeRaw).success
+        ? (propertyTypeRaw as PropertyType)
+        : "Apartamento",
+      condominium: condominiumRaw || undefined,
+      code: codeRaw || undefined,
       image: coverImage,
       gallery: galleryUrls,
       beds,
@@ -184,6 +220,8 @@ propertiesRouter.get("/", (c) => {
   const properties = listProperties({
     ...parsed.data,
     badge: parsed.data.badge as PropertyBadge | undefined,
+    purpose: parsed.data.purpose as PropertyPurpose | undefined,
+    propertyType: parsed.data.propertyType as PropertyType | undefined,
   });
 
   return c.json({ data: properties, total: properties.length });

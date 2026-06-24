@@ -1,8 +1,8 @@
 import { db, propertyCount } from "./index.js";
 import { currentTimestampIso } from "../lib/time.js";
-import type { Property } from "../types/property.js";
+import type { Property, PropertyPurpose, PropertyType } from "../types/property.js";
 
-type SeedProperty = Omit<Property, "createdAt">;
+type SeedProperty = Omit<Property, "createdAt" | "purpose" | "propertyType" | "condominium" | "code">;
 
 const IMG = {
   p1: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=80&auto=format&fit=crop",
@@ -745,19 +745,138 @@ const SEED_PROPERTIES: SeedProperty[] = [
   },
 ];
 
+type PropertyMeta = {
+  purpose: PropertyPurpose;
+  propertyType: PropertyType;
+  condominium?: string;
+  code: string;
+};
+
+const PROPERTY_META: Record<string, PropertyMeta> = {
+  "casa-em-condominio": {
+    purpose: "comprar",
+    propertyType: "Casa em Condomínio",
+    condominium: "Alphaville Residencial One",
+    code: "LOT-001",
+  },
+  "edificio-lotus-residence": {
+    purpose: "comprar",
+    propertyType: "Edifício",
+    condominium: "Lótus Residence",
+    code: "LOT-002",
+  },
+  "apartamento-premium": {
+    purpose: "comprar",
+    propertyType: "Apartamento",
+    code: "LOT-003",
+  },
+  "cobertura-duplex-jardins": {
+    purpose: "comprar",
+    propertyType: "Cobertura",
+    code: "LOT-004",
+  },
+  "studio-moderno-pinheiros": {
+    purpose: "alugar",
+    propertyType: "Apartamento",
+    code: "LOT-005",
+  },
+  "casa-de-campo-atibaia": {
+    purpose: "comprar",
+    propertyType: "Casa de campo",
+    code: "LOT-006",
+  },
+  "apartamento-frente-mar-santos": {
+    purpose: "comprar",
+    propertyType: "Apartamento",
+    code: "LOT-007",
+  },
+  "loft-industrial-vila-madalena": {
+    purpose: "alugar",
+    propertyType: "Espaço comercial",
+    code: "LOT-008",
+  },
+  "mansao-alto-padrao-morumbi": {
+    purpose: "comprar",
+    propertyType: "Casa",
+    code: "LOT-009",
+  },
+  "apartamento-garden-moema": {
+    purpose: "comprar",
+    propertyType: "Apartamento",
+    code: "LOT-010",
+  },
+  "casa-terrea-granja-viana": {
+    purpose: "comprar",
+    propertyType: "Casa em Condomínio",
+    condominium: "Granja Viana Clube",
+    code: "LOT-011",
+  },
+  "flat-mobiliado-itaim-bibi": {
+    purpose: "alugar",
+    propertyType: "Apartamento",
+    code: "LOT-012",
+  },
+  "terreno-condominio-tambore": {
+    purpose: "comprar",
+    propertyType: "Terreno em Condomínio",
+    condominium: "Condomínio Tamboré",
+    code: "LOT-013",
+  },
+  "apartamento-compacto-tatuape": {
+    purpose: "comprar",
+    propertyType: "Apartamento",
+    code: "LOT-014",
+  },
+  "casa-geminada-campinas": {
+    purpose: "comprar",
+    propertyType: "Sobrado",
+    code: "LOT-015",
+  },
+  "residencial-clube-brooklin": {
+    purpose: "comprar",
+    propertyType: "Condomínio",
+    condominium: "Residencial Clube Brooklin",
+    code: "LOT-016",
+  },
+  "penthouse-vista-mar-guaruja": {
+    purpose: "comprar",
+    propertyType: "Cobertura",
+    code: "LOT-017",
+  },
+  "apartamento-classico-higienopolis": {
+    purpose: "comprar",
+    propertyType: "Apartamento",
+    code: "LOT-018",
+  },
+  "casa-colonial-campos-do-jordao": {
+    purpose: "comprar",
+    propertyType: "Casa de campo",
+    code: "LOT-019",
+  },
+  "studio-executivo-faria-lima": {
+    purpose: "alugar",
+    propertyType: "Apartamento",
+    code: "LOT-020",
+  },
+};
+
 const upsert = db.prepare(`
   INSERT INTO properties (
-    slug, title, location, address, badge, image, gallery,
-    beds, baths, parking, area, price, price_value, description, features, created_at
+    slug, title, location, address, badge, purpose, property_type, condominium, code,
+    image, gallery, beds, baths, parking, area, price, price_value, description, features, created_at
   ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
   )
   ON CONFLICT(slug) DO UPDATE SET
     title = excluded.title,
     location = excluded.location,
     address = excluded.address,
     badge = excluded.badge,
+    purpose = excluded.purpose,
+    property_type = excluded.property_type,
+    condominium = excluded.condominium,
+    code = excluded.code,
     image = excluded.image,
     gallery = excluded.gallery,
     beds = excluded.beds,
@@ -772,12 +891,22 @@ const upsert = db.prepare(`
 
 export function seedDatabase() {
   for (const p of SEED_PROPERTIES) {
+    const meta = PROPERTY_META[p.slug] ?? {
+      purpose: "comprar" as const,
+      propertyType: "Apartamento" as const,
+      code: p.slug.toUpperCase().replace(/-/g, "_"),
+    };
+
     upsert.run(
       p.slug,
       p.title,
       p.location,
       p.address,
       p.badge ?? null,
+      meta.purpose,
+      meta.propertyType,
+      meta.condominium ?? null,
+      meta.code,
       p.image,
       JSON.stringify(p.gallery),
       p.beds,

@@ -7,6 +7,10 @@ export type PropertyRow = {
   location: string;
   address: string;
   badge: string | null;
+  purpose: string;
+  property_type: string;
+  condominium: string | null;
+  code: string | null;
   image: string;
   gallery: string;
   beds: number;
@@ -38,6 +42,10 @@ export function rowToProperty(row: PropertyRow): Property {
     location: row.location,
     address: row.address,
     badge: row.badge ? (row.badge as Property["badge"]) : undefined,
+    purpose: (row.purpose as Property["purpose"]) || "comprar",
+    propertyType: (row.property_type as Property["propertyType"]) || "Apartamento",
+    condominium: row.condominium ?? undefined,
+    code: row.code ?? undefined,
     image: row.image,
     gallery: JSON.parse(row.gallery) as string[],
     beds: row.beds,
@@ -75,6 +83,22 @@ export const CREATE_PROPERTIES_TABLE = `
 
 export const MIGRATE_PROPERTIES_CREATED_AT = `
   ALTER TABLE properties ADD COLUMN created_at TEXT
+`;
+
+export const MIGRATE_PROPERTIES_SEARCH_FIELDS = `
+  ALTER TABLE properties ADD COLUMN purpose TEXT NOT NULL DEFAULT 'comprar'
+`;
+
+export const MIGRATE_PROPERTIES_PROPERTY_TYPE = `
+  ALTER TABLE properties ADD COLUMN property_type TEXT NOT NULL DEFAULT 'Apartamento'
+`;
+
+export const MIGRATE_PROPERTIES_CONDOMINIUM = `
+  ALTER TABLE properties ADD COLUMN condominium TEXT
+`;
+
+export const MIGRATE_PROPERTIES_CODE = `
+  ALTER TABLE properties ADD COLUMN code TEXT
 `;
 
 export const CREATE_INQUIRIES_TABLE = `

@@ -16,10 +16,33 @@ const featureIconSchema = z.enum([
     "elevator",
     "balcony",
 ]);
+const purposeSchema = z.enum(["comprar", "alugar"]);
+const propertyTypeSchema = z.enum([
+    "Apartamento",
+    "Casa",
+    "Casa unifamiliar",
+    "Casa em Condomínio",
+    "Sobrado",
+    "Casa de campo",
+    "Casa de campo em condomínio",
+    "Cobertura",
+    "Chácara",
+    "Galpão",
+    "Prédio comercial",
+    "Terreno",
+    "Terreno em Condomínio",
+    "Edifício",
+    "Espaço comercial",
+    "Condomínio",
+]);
 const listQuerySchema = z.object({
     q: z.string().optional(),
     badge: badgeSchema.optional(),
     location: z.string().optional(),
+    purpose: purposeSchema.optional(),
+    propertyType: propertyTypeSchema.optional(),
+    condominium: z.string().optional(),
+    code: z.string().optional(),
     minBeds: z.coerce.number().int().min(0).optional(),
     minPrice: z.coerce.number().int().min(0).optional(),
     maxPrice: z.coerce.number().int().min(0).optional(),
@@ -101,6 +124,10 @@ async function parsePropertyMultipart(body, options) {
     const descriptionRaw = String(body.description ?? "").trim();
     const priceRaw = String(body.price ?? "").trim();
     const badgeRaw = String(body.badge ?? "").trim();
+    const purposeRaw = String(body.purpose ?? "comprar").trim();
+    const propertyTypeRaw = String(body.propertyType ?? "Apartamento").trim();
+    const condominiumRaw = String(body.condominium ?? "").trim();
+    const codeRaw = String(body.code ?? "").trim();
     const beds = Number(body.beds);
     const baths = Number(body.baths);
     const parking = Number(body.parking);
@@ -147,6 +174,14 @@ async function parsePropertyMultipart(body, options) {
             location,
             address,
             badge: badgeSchema.safeParse(badgeRaw).success ? badgeRaw : undefined,
+            purpose: purposeSchema.safeParse(purposeRaw).success
+                ? purposeRaw
+                : "comprar",
+            propertyType: propertyTypeSchema.safeParse(propertyTypeRaw).success
+                ? propertyTypeRaw
+                : "Apartamento",
+            condominium: condominiumRaw || undefined,
+            code: codeRaw || undefined,
             image: coverImage,
             gallery: galleryUrls,
             beds,
@@ -169,6 +204,8 @@ propertiesRouter.get("/", (c) => {
     const properties = listProperties({
         ...parsed.data,
         badge: parsed.data.badge,
+        purpose: parsed.data.purpose,
+        propertyType: parsed.data.propertyType,
     });
     return c.json({ data: properties, total: properties.length });
 });

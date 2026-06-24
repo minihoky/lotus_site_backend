@@ -2,8 +2,9 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CREATE_INQUIRIES_TABLE, CREATE_PROPERTIES_TABLE, MIGRATE_PROPERTIES_CREATED_AT, rowToProperty, } from "./schema.js";
+import { CREATE_INQUIRIES_TABLE, CREATE_PROPERTIES_TABLE, MIGRATE_INQUIRIES_READ_AT, MIGRATE_PROPERTIES_CODE, MIGRATE_PROPERTIES_CONDOMINIUM, MIGRATE_PROPERTIES_CREATED_AT, MIGRATE_PROPERTIES_PROPERTY_TYPE, MIGRATE_PROPERTIES_SEARCH_FIELDS, rowToProperty, } from "./schema.js";
 import { generateUniqueSlug } from "../lib/slug.js";
+import { currentTimestampIso, storedTimestampToIso } from "../lib/time.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "..", "..", "data");
 const dbPath = process.env.DATABASE_PATH ?? join(dataDir, "lotus.db");
@@ -15,12 +16,33 @@ db.exec(CREATE_PROPERTIES_TABLE);
 db.exec(CREATE_INQUIRIES_TABLE);
 function migratePropertiesTable() {
     const columns = db.prepare("PRAGMA table_info(properties)").all();
-    if (!columns.some((column) => column.name === "created_at")) {
+    const hasColumn = (name) => columns.some((column) => column.name === name);
+    if (!hasColumn("created_at")) {
         db.exec(MIGRATE_PROPERTIES_CREATED_AT);
+    }
+    if (!hasColumn("purpose")) {
+        db.exec(MIGRATE_PROPERTIES_SEARCH_FIELDS);
+    }
+    if (!hasColumn("property_type")) {
+        db.exec(MIGRATE_PROPERTIES_PROPERTY_TYPE);
+    }
+    if (!hasColumn("condominium")) {
+        db.exec(MIGRATE_PROPERTIES_CONDOMINIUM);
+    }
+    if (!hasColumn("code")) {
+        db.exec(MIGRATE_PROPERTIES_CODE);
     }
     db.exec("UPDATE properties SET created_at = datetime('now') WHERE created_at IS NULL");
 }
 migratePropertiesTable();
+function migrateInquiriesTable() {
+    const columns = db.prepare("PRAGMA table_info(inquiries)").all();
+    if (!columns.some((column) => column.name === "read_at")) {
+        db.exec(MIGRATE_INQUIRIES_READ_AT);
+        db.exec("UPDATE inquiries SET read_at = created_at WHERE read_at IS NULL");
+    }
+}
+migrateInquiriesTable();
 function orderClause(sort) {
     return sort === "price" ? "price_value DESC" : "created_at DESC";
 }
@@ -28,9 +50,9 @@ export function listProperties(filters = {}) {
     const conditions = [];
     const params = [];
     if (filters.q) {
-        conditions.push("(title LIKE ? OR location LIKE ? OR address LIKE ? OR description LIKE ?)");
+        conditions.push("(title LIKE ? OR location LIKE ? OR address LIKE ? OR description LIKE ? OR code LIKE ?)");
         const term = `%${filters.q}%`;
-        params.push(term, term, term, term);
+        params.push(term, term, term, term, term);
     }
     if (filters.badge) {
         conditions.push("badge = ?");
@@ -39,6 +61,22 @@ export function listProperties(filters = {}) {
     if (filters.location) {
         conditions.push("location LIKE ?");
         params.push(`%${filters.location}%`);
+    }
+    if (filters.purpose) {
+        conditions.push("purpose = ?");
+        params.push(filters.purpose);
+    }
+    if (filters.propertyType) {
+        conditions.push("property_type = ?");
+        params.push(filters.propertyType);
+    }
+    if (filters.condominium) {
+        conditions.push("condominium = ?");
+        params.push(filters.condominium);
+    }
+    if (filters.code) {
+        conditions.push("code LIKE ?");
+        params.push(`%${filters.code}%`);
     }
     if (filters.minBeds !== undefined) {
         conditions.push("beds >= ?");
@@ -74,10 +112,24 @@ export function getSimilarProperties(slug, limit = 3) {
     const rows = stmt.all(slug, slug, limit);
     return rows.map(rowToProperty);
 }
+function mapInquiryRow(row) {
+    return {
+        id: row.id,
+        propertySlug: row.property_slug,
+        propertyTitle: row.property_title,
+        name: row.name,
+        phone: row.phone,
+        email: row.email,
+        message: row.message,
+        createdAt: storedTimestampToIso(row.created_at) ?? row.created_at,
+        readAt: storedTimestampToIso(row.read_at),
+    };
+}
 export function createInquiry(input) {
-    const stmt = db.prepare(`INSERT INTO inquiries (property_slug, name, phone, email, message)
-     VALUES (?, ?, ?, ?, ?)`);
-    const result = stmt.run(input.propertySlug ?? null, input.name, input.phone, input.email, input.message ?? null);
+    const createdAt = currentTimestampIso();
+    const stmt = db.prepare(`INSERT INTO inquiries (property_slug, name, phone, email, message, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`);
+    const result = stmt.run(input.propertySlug ?? null, input.name, input.phone, input.email, input.message ?? null, createdAt);
     return { id: Number(result.lastInsertRowid) };
 }
 export function listInquiries(limit) {
@@ -92,6 +144,7 @@ export function listInquiries(limit) {
       i.email,
       i.message,
       i.created_at,
+      i.read_at,
       p.title AS property_title
     FROM inquiries i
     LEFT JOIN properties p ON i.property_slug = p.slug
@@ -99,33 +152,63 @@ export function listInquiries(limit) {
     ${limitClause}
   `);
     const rows = stmt.all();
-    return rows.map((row) => ({
-        id: row.id,
-        propertySlug: row.property_slug,
-        propertyTitle: row.property_title,
-        name: row.name,
-        phone: row.phone,
-        email: row.email,
-        message: row.message,
-        createdAt: row.created_at,
-    }));
+    return rows.map(mapInquiryRow);
 }
 export function deleteInquiry(id) {
     const result = db.prepare("DELETE FROM inquiries WHERE id = ?").run(id);
     return result.changes > 0;
 }
+export function countUnreadInquiries() {
+    const row = db.prepare("SELECT COUNT(*) as count FROM inquiries WHERE read_at IS NULL").get();
+    return row.count;
+}
+export function listUnreadInquiries() {
+    const stmt = db.prepare(`
+    SELECT
+      i.id,
+      i.property_slug,
+      i.name,
+      i.phone,
+      i.email,
+      i.message,
+      i.created_at,
+      i.read_at,
+      p.title AS property_title
+    FROM inquiries i
+    LEFT JOIN properties p ON i.property_slug = p.slug
+    WHERE i.read_at IS NULL
+    ORDER BY i.created_at DESC
+  `);
+    const rows = stmt.all();
+    return rows.map(mapInquiryRow);
+}
+export function markInquiriesAsRead(ids) {
+    const readAt = currentTimestampIso();
+    if (ids !== undefined && ids.length > 0) {
+        const placeholders = ids.map(() => "?").join(", ");
+        const result = db
+            .prepare(`UPDATE inquiries SET read_at = ? WHERE id IN (${placeholders}) AND read_at IS NULL`)
+            .run(readAt, ...ids);
+        return Number(result.changes);
+    }
+    const result = db
+        .prepare("UPDATE inquiries SET read_at = ? WHERE read_at IS NULL")
+        .run(readAt);
+    return Number(result.changes);
+}
 export function createProperty(input) {
     const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
+    const createdAt = currentTimestampIso();
     const stmt = db.prepare(`
     INSERT INTO properties (
-      slug, title, location, address, badge, image, gallery,
-      beds, baths, parking, area, price, price_value, description, features, created_at
+      slug, title, location, address, badge, purpose, property_type, condominium, code,
+      image, gallery, beds, baths, parking, area, price, price_value, description, features, created_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
   `);
-    stmt.run(slug, input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(input.features));
+    stmt.run(slug, input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.purpose ?? "comprar", input.propertyType ?? "Apartamento", input.condominium ?? null, input.code ?? null, input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(input.features), createdAt);
     const created = getPropertyBySlug(slug);
     if (!created) {
         throw new Error("Failed to create property");
@@ -147,6 +230,10 @@ export function updateProperty(slug, input) {
       location = ?,
       address = ?,
       badge = ?,
+      purpose = ?,
+      property_type = ?,
+      condominium = ?,
+      code = ?,
       image = ?,
       gallery = ?,
       beds = ?,
@@ -159,7 +246,7 @@ export function updateProperty(slug, input) {
       features = ?
     WHERE slug = ?
   `);
-    stmt.run(input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(input.features), slug);
+    stmt.run(input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.purpose ?? "comprar", input.propertyType ?? "Apartamento", input.condominium ?? null, input.code ?? null, input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(input.features), slug);
     const updated = getPropertyBySlug(slug);
     if (!updated) {
         throw new Error("Failed to update property");

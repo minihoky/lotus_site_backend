@@ -5,6 +5,10 @@ export type PropertyRow = {
     location: string;
     address: string;
     badge: string | null;
+    purpose: string;
+    property_type: string;
+    condominium: string | null;
+    code: string | null;
     image: string;
     gallery: string;
     beds: number;
@@ -25,8 +29,14 @@ export type InquiryRow = {
     email: string;
     message: string | null;
     created_at: string;
+    read_at: string | null;
 };
 export declare function rowToProperty(row: PropertyRow): Property;
-export declare const CREATE_PROPERTIES_TABLE = "\n  CREATE TABLE IF NOT EXISTS properties (\n    slug TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    location TEXT NOT NULL,\n    address TEXT NOT NULL,\n    badge TEXT,\n    image TEXT NOT NULL,\n    gallery TEXT NOT NULL,\n    beds INTEGER NOT NULL,\n    baths INTEGER NOT NULL,\n    parking INTEGER NOT NULL,\n    area INTEGER NOT NULL,\n    price TEXT NOT NULL,\n    price_value INTEGER NOT NULL,\n    description TEXT NOT NULL,\n    features TEXT NOT NULL,\n    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n  )\n";
+export declare const CREATE_PROPERTIES_TABLE = "\n  CREATE TABLE IF NOT EXISTS properties (\n    slug TEXT PRIMARY KEY,\n    title TEXT NOT NULL,\n    location TEXT NOT NULL,\n    address TEXT NOT NULL,\n    badge TEXT,\n    image TEXT NOT NULL,\n    gallery TEXT NOT NULL,\n    beds INTEGER NOT NULL,\n    baths INTEGER NOT NULL,\n    parking INTEGER NOT NULL,\n    area INTEGER NOT NULL,\n    price TEXT NOT NULL,\n    price_value INTEGER NOT NULL,\n    description TEXT NOT NULL,\n    features TEXT NOT NULL,\n    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))\n  )\n";
 export declare const MIGRATE_PROPERTIES_CREATED_AT = "\n  ALTER TABLE properties ADD COLUMN created_at TEXT\n";
-export declare const CREATE_INQUIRIES_TABLE = "\n  CREATE TABLE IF NOT EXISTS inquiries (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    property_slug TEXT,\n    name TEXT NOT NULL,\n    phone TEXT NOT NULL,\n    email TEXT NOT NULL,\n    message TEXT,\n    created_at TEXT NOT NULL DEFAULT (datetime('now'))\n  )\n";
+export declare const MIGRATE_PROPERTIES_SEARCH_FIELDS = "\n  ALTER TABLE properties ADD COLUMN purpose TEXT NOT NULL DEFAULT 'comprar'\n";
+export declare const MIGRATE_PROPERTIES_PROPERTY_TYPE = "\n  ALTER TABLE properties ADD COLUMN property_type TEXT NOT NULL DEFAULT 'Apartamento'\n";
+export declare const MIGRATE_PROPERTIES_CONDOMINIUM = "\n  ALTER TABLE properties ADD COLUMN condominium TEXT\n";
+export declare const MIGRATE_PROPERTIES_CODE = "\n  ALTER TABLE properties ADD COLUMN code TEXT\n";
+export declare const CREATE_INQUIRIES_TABLE = "\n  CREATE TABLE IF NOT EXISTS inquiries (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    property_slug TEXT,\n    name TEXT NOT NULL,\n    phone TEXT NOT NULL,\n    email TEXT NOT NULL,\n    message TEXT,\n    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),\n    read_at TEXT\n  )\n";
+export declare const MIGRATE_INQUIRIES_READ_AT = "\n  ALTER TABLE inquiries ADD COLUMN read_at TEXT\n";

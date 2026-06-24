@@ -7,4 +7,5 @@ export type Inquiry = {
     email: string;
     message: string | null;
     createdAt: string;
+    readAt: string | null;
 };

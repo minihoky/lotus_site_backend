@@ -1,1 +1,18 @@
-export {};
+export const PROPERTY_TYPES = [
+    "Apartamento",
+    "Casa",
+    "Casa unifamiliar",
+    "Casa em Condomínio",
+    "Sobrado",
+    "Casa de campo",
+    "Casa de campo em condomínio",
+    "Cobertura",
+    "Chácara",
+    "Galpão",
+    "Prédio comercial",
+    "Terreno",
+    "Terreno em Condomínio",
+    "Edifício",
+    "Espaço comercial",
+    "Condomínio",
+];

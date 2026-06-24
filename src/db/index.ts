@@ -6,7 +6,11 @@ import {
   CREATE_INQUIRIES_TABLE,
   CREATE_PROPERTIES_TABLE,
   MIGRATE_INQUIRIES_READ_AT,
+  MIGRATE_PROPERTIES_CODE,
+  MIGRATE_PROPERTIES_CONDOMINIUM,
   MIGRATE_PROPERTIES_CREATED_AT,
+  MIGRATE_PROPERTIES_PROPERTY_TYPE,
+  MIGRATE_PROPERTIES_SEARCH_FIELDS,
   rowToProperty,
   type PropertyRow,
 } from "./schema.js";
@@ -29,9 +33,24 @@ db.exec(CREATE_INQUIRIES_TABLE);
 
 function migratePropertiesTable() {
   const columns = db.prepare("PRAGMA table_info(properties)").all() as { name: string }[];
-  if (!columns.some((column) => column.name === "created_at")) {
+  const hasColumn = (name: string) => columns.some((column) => column.name === name);
+
+  if (!hasColumn("created_at")) {
     db.exec(MIGRATE_PROPERTIES_CREATED_AT);
   }
+  if (!hasColumn("purpose")) {
+    db.exec(MIGRATE_PROPERTIES_SEARCH_FIELDS);
+  }
+  if (!hasColumn("property_type")) {
+    db.exec(MIGRATE_PROPERTIES_PROPERTY_TYPE);
+  }
+  if (!hasColumn("condominium")) {
+    db.exec(MIGRATE_PROPERTIES_CONDOMINIUM);
+  }
+  if (!hasColumn("code")) {
+    db.exec(MIGRATE_PROPERTIES_CODE);
+  }
+
   db.exec("UPDATE properties SET created_at = datetime('now') WHERE created_at IS NULL");
 }
 
@@ -57,10 +76,10 @@ export function listProperties(filters: PropertyFilters = {}): Property[] {
 
   if (filters.q) {
     conditions.push(
-      "(title LIKE ? OR location LIKE ? OR address LIKE ? OR description LIKE ?)",
+      "(title LIKE ? OR location LIKE ? OR address LIKE ? OR description LIKE ? OR code LIKE ?)",
     );
     const term = `%${filters.q}%`;
-    params.push(term, term, term, term);
+    params.push(term, term, term, term, term);
   }
 
   if (filters.badge) {
@@ -71,6 +90,26 @@ export function listProperties(filters: PropertyFilters = {}): Property[] {
   if (filters.location) {
     conditions.push("location LIKE ?");
     params.push(`%${filters.location}%`);
+  }
+
+  if (filters.purpose) {
+    conditions.push("purpose = ?");
+    params.push(filters.purpose);
+  }
+
+  if (filters.propertyType) {
+    conditions.push("property_type = ?");
+    params.push(filters.propertyType);
+  }
+
+  if (filters.condominium) {
+    conditions.push("condominium = ?");
+    params.push(filters.condominium);
+  }
+
+  if (filters.code) {
+    conditions.push("code LIKE ?");
+    params.push(`%${filters.code}%`);
   }
 
   if (filters.minBeds !== undefined) {
@@ -272,11 +311,11 @@ export function createProperty(input: CreatePropertyInput): Property {
 
   const stmt = db.prepare(`
     INSERT INTO properties (
-      slug, title, location, address, badge, image, gallery,
-      beds, baths, parking, area, price, price_value, description, features, created_at
+      slug, title, location, address, badge, purpose, property_type, condominium, code,
+      image, gallery, beds, baths, parking, area, price, price_value, description, features, created_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
   `);
 
@@ -286,6 +325,10 @@ export function createProperty(input: CreatePropertyInput): Property {
     input.location,
     input.address,
     input.badge ?? "DESTAQUE",
+    input.purpose ?? "comprar",
+    input.propertyType ?? "Apartamento",
+    input.condominium ?? null,
+    input.code ?? null,
     input.image,
     JSON.stringify(input.gallery),
     input.beds,
@@ -323,6 +366,10 @@ export function updateProperty(slug: string, input: CreatePropertyInput): Proper
       location = ?,
       address = ?,
       badge = ?,
+      purpose = ?,
+      property_type = ?,
+      condominium = ?,
+      code = ?,
       image = ?,
       gallery = ?,
       beds = ?,
@@ -341,6 +388,10 @@ export function updateProperty(slug: string, input: CreatePropertyInput): Proper
     input.location,
     input.address,
     input.badge ?? "DESTAQUE",
+    input.purpose ?? "comprar",
+    input.propertyType ?? "Apartamento",
+    input.condominium ?? null,
+    input.code ?? null,
     input.image,
     JSON.stringify(input.gallery),
     input.beds,

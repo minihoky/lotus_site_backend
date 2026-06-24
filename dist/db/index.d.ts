@@ -17,6 +17,9 @@ export declare function createInquiry(input: {
 };
 export declare function listInquiries(limit?: number): Inquiry[];
 export declare function deleteInquiry(id: number): boolean;
+export declare function countUnreadInquiries(): number;
+export declare function listUnreadInquiries(): Inquiry[];
+export declare function markInquiriesAsRead(ids?: number[]): number;
 export declare function createProperty(input: CreatePropertyInput): Property;
 export declare function deleteProperty(slug: string): boolean;
 export declare function updateProperty(slug: string, input: CreatePropertyInput): Property;
