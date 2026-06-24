@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
+import { normalizeCondominiumName } from "../lib/condominium.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 import type { PropertyBadge, PropertyFeatureIcon, PropertyPurpose, PropertyType } from "../types/property.js";
 
@@ -193,7 +194,7 @@ async function parsePropertyMultipart(body: Record<string, unknown>, options?: {
       propertyType: propertyTypeSchema.safeParse(propertyTypeRaw).success
         ? (propertyTypeRaw as PropertyType)
         : "Apartamento",
-      condominium: condominiumRaw || undefined,
+      condominium: normalizeCondominiumName(condominiumRaw),
       code: codeRaw || undefined,
       image: coverImage,
       gallery: galleryUrls,

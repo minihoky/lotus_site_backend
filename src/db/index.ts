@@ -103,8 +103,8 @@ export function listProperties(filters: PropertyFilters = {}): Property[] {
   }
 
   if (filters.condominium) {
-    conditions.push("condominium = ?");
-    params.push(filters.condominium);
+    conditions.push("LOWER(TRIM(condominium)) = LOWER(TRIM(?))");
+    params.push(filters.condominium.trim());
   }
 
   if (filters.code) {

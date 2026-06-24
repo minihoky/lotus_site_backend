@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
+import { normalizeCondominiumName } from "../lib/condominium.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
 const featureIconSchema = z.enum([
@@ -180,7 +181,7 @@ async function parsePropertyMultipart(body, options) {
             propertyType: propertyTypeSchema.safeParse(propertyTypeRaw).success
                 ? propertyTypeRaw
                 : "Apartamento",
-            condominium: condominiumRaw || undefined,
+            condominium: normalizeCondominiumName(condominiumRaw),
             code: codeRaw || undefined,
             image: coverImage,
             gallery: galleryUrls,
