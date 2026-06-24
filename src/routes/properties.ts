@@ -19,6 +19,8 @@ const featureIconSchema = z.enum([
   "parking",
   "elevator",
   "balcony",
+  "beach",
+  "marina",
 ]);
 
 const purposeSchema = z.enum(["comprar", "alugar"]);
@@ -101,6 +103,46 @@ function defaultFeatures(parking: number): { label: string; icon: PropertyFeatur
     });
   }
   return features;
+}
+
+function parseFeaturesFromBody(
+  body: Record<string, unknown>,
+  parking: number,
+): { label: string; icon: PropertyFeatureIcon }[] {
+  const raw = body.features;
+  if (typeof raw !== "string") {
+    return defaultFeatures(parking);
+  }
+
+  if (!raw.trim()) {
+    return defaultFeatures(parking);
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return defaultFeatures(parking);
+
+    if (parsed.length === 0) return [];
+
+    const features = parsed
+      .filter(
+        (item): item is { label: unknown; icon: unknown } =>
+          typeof item === "object" && item !== null && "label" in item && "icon" in item,
+      )
+      .map((item) => ({
+        label: String(item.label).trim(),
+        icon: String(item.icon).trim(),
+      }))
+      .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
+      .map((item) => ({
+        label: item.label,
+        icon: item.icon as PropertyFeatureIcon,
+      }));
+
+    return features.length > 0 ? features : defaultFeatures(parking);
+  } catch {
+    return defaultFeatures(parking);
+  }
 }
 
 function asFile(value: unknown): File | undefined {
@@ -205,7 +247,7 @@ async function parsePropertyMultipart(body: Record<string, unknown>, options?: {
       price: formatBrazilianPrice(priceValue),
       priceValue,
       description: toDescriptionArray(descriptionRaw),
-      features: defaultFeatures(parking),
+      features: parseFeaturesFromBody(body, parking),
     },
   };
 }

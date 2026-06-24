@@ -33,7 +33,9 @@ export type PropertyFeatureIcon =
   | "wifi"
   | "parking"
   | "elevator"
-  | "balcony";
+  | "balcony"
+  | "beach"
+  | "marina";
 
 export type PropertyFeature = {
   label: string;

@@ -16,6 +16,8 @@ const featureIconSchema = z.enum([
     "parking",
     "elevator",
     "balcony",
+    "beach",
+    "marina",
 ]);
 const purposeSchema = z.enum(["comprar", "alugar"]);
 const propertyTypeSchema = z.enum([
@@ -91,6 +93,37 @@ function defaultFeatures(parking) {
         });
     }
     return features;
+}
+function parseFeaturesFromBody(body, parking) {
+    const raw = body.features;
+    if (typeof raw !== "string") {
+        return defaultFeatures(parking);
+    }
+    if (!raw.trim()) {
+        return defaultFeatures(parking);
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed))
+            return defaultFeatures(parking);
+        if (parsed.length === 0)
+            return [];
+        const features = parsed
+            .filter((item) => typeof item === "object" && item !== null && "label" in item && "icon" in item)
+            .map((item) => ({
+            label: String(item.label).trim(),
+            icon: String(item.icon).trim(),
+        }))
+            .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
+            .map((item) => ({
+            label: item.label,
+            icon: item.icon,
+        }));
+        return features.length > 0 ? features : defaultFeatures(parking);
+    }
+    catch {
+        return defaultFeatures(parking);
+    }
 }
 function asFile(value) {
     return value instanceof File && value.size > 0 ? value : undefined;
@@ -192,7 +225,7 @@ async function parsePropertyMultipart(body, options) {
             price: formatBrazilianPrice(priceValue),
             priceValue,
             description: toDescriptionArray(descriptionRaw),
-            features: defaultFeatures(parking),
+            features: parseFeaturesFromBody(body, parking),
         },
     };
 }
