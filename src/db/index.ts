@@ -145,6 +145,18 @@ export function listRecentProperties(limit = 5): Property[] {
   return listProperties({ limit, sort: "recent" });
 }
 
+export function listCondominiums(): string[] {
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT condominium FROM properties
+       WHERE condominium IS NOT NULL AND TRIM(condominium) != ''
+       ORDER BY condominium COLLATE NOCASE`,
+    )
+    .all() as { condominium: string }[];
+
+  return rows.map((row) => row.condominium.trim());
+}
+
 export function getPropertyBySlug(slug: string): Property | undefined {
   const stmt = db.prepare("SELECT * FROM properties WHERE slug = ?");
   const row = stmt.get(slug) as PropertyRow | undefined;

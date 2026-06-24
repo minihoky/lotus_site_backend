@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
+import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
@@ -216,6 +216,10 @@ propertiesRouter.get("/recent", (c) => {
     }
     const properties = listRecentProperties(parsed.data.limit ?? 5);
     return c.json({ data: properties, total: properties.length });
+});
+propertiesRouter.get("/condominiums", (c) => {
+    const condominiums = listCondominiums();
+    return c.json({ data: condominiums, total: condominiums.length });
 });
 propertiesRouter.post("/", async (c) => {
     const contentType = c.req.header("content-type") ?? "";
