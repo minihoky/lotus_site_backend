@@ -10,6 +10,20 @@ export const KEY_FEATURE_CATALOG = [
 ];
 const CATALOG_BY_ID = new Map(KEY_FEATURE_CATALOG.map((entry) => [entry.id, entry]));
 const CATALOG_ID_SET = new Set(KEY_FEATURE_CATALOG.map((entry) => entry.id));
+const VALID_ICONS = new Set([
+    "pool",
+    "gourmet",
+    "security",
+    "ac",
+    "gym",
+    "garden",
+    "wifi",
+    "parking",
+    "elevator",
+    "balcony",
+    "beach",
+    "marina",
+]);
 const LABEL_ALIASES = {
     private_pool: [/piscina/i, /swimming\s*pool/i, /private\s*pool/i],
     terrace: [/terra[cç]o/i, /terrace/i, /varanda/i, /balcon/i],
@@ -56,7 +70,24 @@ function parkingLabel(parking) {
         return "1 parking space";
     return `${parking} parking spaces`;
 }
-export function normalizeKeyFeaturesForDisplay(features, parking = 0) {
+function dedupeFeatures(features) {
+    const seen = new Set();
+    const result = [];
+    for (const feature of features) {
+        const key = feature.amenityId ?? `${feature.icon}:${feature.label.toLowerCase()}`;
+        if (seen.has(key))
+            continue;
+        seen.add(key);
+        result.push(feature);
+    }
+    return result;
+}
+export function extractCustomFeatures(features) {
+    return dedupeFeatures(features.filter((feature) => VALID_ICONS.has(feature.icon) &&
+        feature.label.trim().length > 0 &&
+        !amenityIdForFeature(feature)));
+}
+function normalizeCatalogFeaturesForDisplay(features, parking = 0) {
     const ids = featuresToAmenityIds(features);
     if (ids.length === 0)
         return [];
@@ -76,6 +107,19 @@ export function normalizeKeyFeaturesForDisplay(features, parking = 0) {
         };
     });
 }
+export function normalizeKeyFeaturesForDisplay(features, parking = 0) {
+    const catalog = normalizeCatalogFeaturesForDisplay(features, parking);
+    const custom = extractCustomFeatures(features).map((feature) => ({
+        label: feature.label.trim(),
+        icon: feature.icon,
+    }));
+    return dedupeFeatures([...catalog, ...custom]);
+}
 export function normalizeKeyFeaturesForStorage(features, parking = 0) {
-    return normalizeKeyFeaturesForDisplay(features, parking);
+    const catalog = normalizeCatalogFeaturesForDisplay(features, parking);
+    const custom = extractCustomFeatures(features).map((feature) => ({
+        label: feature.label.trim(),
+        icon: feature.icon,
+    }));
+    return dedupeFeatures([...catalog, ...custom]);
 }
