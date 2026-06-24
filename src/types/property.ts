@@ -37,9 +37,20 @@ export type PropertyFeatureIcon =
   | "beach"
   | "marina";
 
+export type PropertyAmenityId =
+  | "private_pool"
+  | "terrace"
+  | "security_24h"
+  | "air_conditioning"
+  | "private_beach"
+  | "marina"
+  | "wifi"
+  | "parking_space";
+
 export type PropertyFeature = {
   label: string;
   icon: PropertyFeatureIcon;
+  amenityId?: PropertyAmenityId;
 };
 
 export type Property = {

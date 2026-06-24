@@ -4,9 +4,20 @@ import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { normalizeCondominiumName } from "../lib/condominium.js";
 import { saveUploadedFile } from "../lib/uploads.js";
-import type { PropertyBadge, PropertyFeatureIcon, PropertyPurpose, PropertyType } from "../types/property.js";
+import type { PropertyAmenityId, PropertyBadge, PropertyFeature, PropertyFeatureIcon, PropertyPurpose, PropertyType } from "../types/property.js";
 
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
+
+const amenityIdSchema = z.enum([
+  "private_pool",
+  "terrace",
+  "security_24h",
+  "air_conditioning",
+  "private_beach",
+  "marina",
+  "wifi",
+  "parking_space",
+]);
 
 const featureIconSchema = z.enum([
   "pool",
@@ -81,6 +92,7 @@ const createPropertyJsonSchema = z.object({
       z.object({
         label: z.string().trim().min(1),
         icon: featureIconSchema,
+        amenityId: amenityIdSchema.optional(),
       }),
     )
     .optional(),
@@ -105,41 +117,61 @@ function defaultFeatures(parking: number): { label: string; icon: PropertyFeatur
   return features;
 }
 
+function parseFeatureItems(raw: unknown): PropertyFeature[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null && "label" in item && "icon" in item,
+    )
+    .map((item) => {
+      const amenityIdRaw = item.amenityId;
+      const amenityId =
+        typeof amenityIdRaw === "string" && amenityIdSchema.safeParse(amenityIdRaw).success
+          ? (amenityIdRaw as PropertyAmenityId)
+          : undefined;
+
+      return {
+        label: String(item.label).trim(),
+        icon: String(item.icon).trim(),
+        amenityId,
+      };
+    })
+    .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
+    .map((item) => ({
+      label: item.label,
+      icon: item.icon as PropertyFeatureIcon,
+      ...(item.amenityId ? { amenityId: item.amenityId } : {}),
+    }));
+}
+
 function parseFeaturesFromBody(
   body: Record<string, unknown>,
-  parking: number,
-): { label: string; icon: PropertyFeatureIcon }[] {
+  parking = 0,
+): PropertyFeature[] {
   const raw = body.features;
-  if (typeof raw !== "string") {
-    return defaultFeatures(parking);
+
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return [];
+    return parseFeatureItems(raw);
   }
 
-  if (!raw.trim()) {
+  if (typeof raw !== "string" || !raw.trim()) {
     return defaultFeatures(parking);
   }
 
   try {
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return defaultFeatures(parking);
+    if (!Array.isArray(parsed)) {
+      return defaultFeatures(parking);
+    }
 
-    if (parsed.length === 0) return [];
+    if (parsed.length === 0) {
+      return [];
+    }
 
-    const features = parsed
-      .filter(
-        (item): item is { label: unknown; icon: unknown } =>
-          typeof item === "object" && item !== null && "label" in item && "icon" in item,
-      )
-      .map((item) => ({
-        label: String(item.label).trim(),
-        icon: String(item.icon).trim(),
-      }))
-      .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
-      .map((item) => ({
-        label: item.label,
-        icon: item.icon as PropertyFeatureIcon,
-      }));
-
-    return features.length > 0 ? features : defaultFeatures(parking);
+    return parseFeatureItems(parsed);
   } catch {
     return defaultFeatures(parking);
   }

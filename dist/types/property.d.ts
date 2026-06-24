@@ -3,9 +3,11 @@ export type PropertyPurpose = "comprar" | "alugar";
 export declare const PROPERTY_TYPES: readonly ["Apartamento", "Casa", "Casa unifamiliar", "Casa em Condomínio", "Sobrado", "Casa de campo", "Casa de campo em condomínio", "Cobertura", "Chácara", "Galpão", "Prédio comercial", "Terreno", "Terreno em Condomínio", "Edifício", "Espaço comercial", "Condomínio"];
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 export type PropertyFeatureIcon = "pool" | "gourmet" | "security" | "ac" | "gym" | "garden" | "wifi" | "parking" | "elevator" | "balcony" | "beach" | "marina";
+export type PropertyAmenityId = "private_pool" | "terrace" | "security_24h" | "air_conditioning" | "private_beach" | "marina" | "wifi" | "parking_space";
 export type PropertyFeature = {
     label: string;
     icon: PropertyFeatureIcon;
+    amenityId?: PropertyAmenityId;
 };
 export type Property = {
     slug: string;

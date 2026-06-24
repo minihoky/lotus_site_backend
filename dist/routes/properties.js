@@ -5,6 +5,16 @@ import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { normalizeCondominiumName } from "../lib/condominium.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
+const amenityIdSchema = z.enum([
+    "private_pool",
+    "terrace",
+    "security_24h",
+    "air_conditioning",
+    "private_beach",
+    "marina",
+    "wifi",
+    "parking_space",
+]);
 const featureIconSchema = z.enum([
     "pool",
     "gourmet",
@@ -73,6 +83,7 @@ const createPropertyJsonSchema = z.object({
         .array(z.object({
         label: z.string().trim().min(1),
         icon: featureIconSchema,
+        amenityId: amenityIdSchema.optional(),
     }))
         .optional(),
 });
@@ -94,32 +105,48 @@ function defaultFeatures(parking) {
     }
     return features;
 }
-function parseFeaturesFromBody(body, parking) {
+function parseFeatureItems(raw) {
+    if (!Array.isArray(raw))
+        return [];
+    return raw
+        .filter((item) => typeof item === "object" && item !== null && "label" in item && "icon" in item)
+        .map((item) => {
+        const amenityIdRaw = item.amenityId;
+        const amenityId = typeof amenityIdRaw === "string" && amenityIdSchema.safeParse(amenityIdRaw).success
+            ? amenityIdRaw
+            : undefined;
+        return {
+            label: String(item.label).trim(),
+            icon: String(item.icon).trim(),
+            amenityId,
+        };
+    })
+        .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
+        .map((item) => ({
+        label: item.label,
+        icon: item.icon,
+        ...(item.amenityId ? { amenityId: item.amenityId } : {}),
+    }));
+}
+function parseFeaturesFromBody(body, parking = 0) {
     const raw = body.features;
-    if (typeof raw !== "string") {
-        return defaultFeatures(parking);
+    if (Array.isArray(raw)) {
+        if (raw.length === 0)
+            return [];
+        return parseFeatureItems(raw);
     }
-    if (!raw.trim()) {
+    if (typeof raw !== "string" || !raw.trim()) {
         return defaultFeatures(parking);
     }
     try {
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed))
+        if (!Array.isArray(parsed)) {
             return defaultFeatures(parking);
-        if (parsed.length === 0)
+        }
+        if (parsed.length === 0) {
             return [];
-        const features = parsed
-            .filter((item) => typeof item === "object" && item !== null && "label" in item && "icon" in item)
-            .map((item) => ({
-            label: String(item.label).trim(),
-            icon: String(item.icon).trim(),
-        }))
-            .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
-            .map((item) => ({
-            label: item.label,
-            icon: item.icon,
-        }));
-        return features.length > 0 ? features : defaultFeatures(parking);
+        }
+        return parseFeatureItems(parsed);
     }
     catch {
         return defaultFeatures(parking);
