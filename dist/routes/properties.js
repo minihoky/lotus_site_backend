@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { normalizeCondominiumName } from "../lib/condominium.js";
+import { normalizeKeyFeaturesForStorage } from "../lib/property-features.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
 const amenityIdSchema = z.enum([
@@ -133,7 +134,7 @@ function parseFeaturesFromBody(body, parking = 0) {
     if (Array.isArray(raw)) {
         if (raw.length === 0)
             return [];
-        return parseFeatureItems(raw);
+        return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
     }
     if (typeof raw !== "string" || !raw.trim()) {
         return defaultFeatures(parking);
@@ -146,7 +147,7 @@ function parseFeaturesFromBody(body, parking = 0) {
         if (parsed.length === 0) {
             return [];
         }
-        return parseFeatureItems(parsed);
+        return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
     }
     catch {
         return defaultFeatures(parking);

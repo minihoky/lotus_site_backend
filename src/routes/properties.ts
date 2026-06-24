@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { normalizeCondominiumName } from "../lib/condominium.js";
+import { normalizeKeyFeaturesForStorage } from "../lib/property-features.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 import type { PropertyAmenityId, PropertyBadge, PropertyFeature, PropertyFeatureIcon, PropertyPurpose, PropertyType } from "../types/property.js";
 
@@ -154,7 +155,7 @@ function parseFeaturesFromBody(
 
   if (Array.isArray(raw)) {
     if (raw.length === 0) return [];
-    return parseFeatureItems(raw);
+    return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
   }
 
   if (typeof raw !== "string" || !raw.trim()) {
@@ -171,7 +172,7 @@ function parseFeaturesFromBody(
       return [];
     }
 
-    return parseFeatureItems(parsed);
+    return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
   } catch {
     return defaultFeatures(parking);
   }

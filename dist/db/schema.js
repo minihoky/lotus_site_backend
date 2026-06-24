@@ -1,3 +1,4 @@
+import { normalizeKeyFeaturesForDisplay } from "../lib/property-features.js";
 import { storedTimestampToIso } from "../lib/time.js";
 export function rowToProperty(row) {
     return {
@@ -19,7 +20,7 @@ export function rowToProperty(row) {
         price: row.price,
         priceValue: row.price_value,
         description: JSON.parse(row.description),
-        features: JSON.parse(row.features),
+        features: normalizeKeyFeaturesForDisplay(JSON.parse(row.features), row.parking),
         createdAt: storedTimestampToIso(row.created_at) ?? new Date(0).toISOString(),
     };
 }

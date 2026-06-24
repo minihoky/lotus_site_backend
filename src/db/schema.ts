@@ -1,4 +1,5 @@
 import type { Property, PropertyFeature } from "../types/property.js";
+import { normalizeKeyFeaturesForDisplay } from "../lib/property-features.js";
 import { storedTimestampToIso } from "../lib/time.js";
 
 export type PropertyRow = {
@@ -55,7 +56,10 @@ export function rowToProperty(row: PropertyRow): Property {
     price: row.price,
     priceValue: row.price_value,
     description: JSON.parse(row.description) as string[],
-    features: JSON.parse(row.features) as PropertyFeature[],
+    features: normalizeKeyFeaturesForDisplay(
+      JSON.parse(row.features) as PropertyFeature[],
+      row.parking,
+    ),
     createdAt: storedTimestampToIso(row.created_at) ?? new Date(0).toISOString(),
   };
 }
