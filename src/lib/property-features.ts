@@ -57,6 +57,8 @@ function amenityIdForFeature(feature: PropertyFeature): PropertyAmenityId | unde
     return "parking_space";
   }
 
+  console.log(feature.icon, "///////// -- feature.icon -- /////");
+
   return KEY_FEATURE_CATALOG.find((entry) => entry.icon === feature.icon)?.id;
 }
 
