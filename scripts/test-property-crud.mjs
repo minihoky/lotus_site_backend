@@ -1,15 +1,13 @@
 /**
  * Integration smoke test for property create/update via multipart (admin flow).
  */
-import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const API = process.env.API_URL ?? "http://127.0.0.1:3001";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function tinyPngBuffer() {
-  // 1x1 transparent PNG
   return Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
     "base64",
@@ -59,6 +57,7 @@ async function updateMultipartProperty(slug, existing) {
   const features = JSON.stringify([
     { label: "Portaria 24h", icon: "security", amenityId: "security_24h" },
     { label: "Sauna privativa", icon: "gym" },
+    { label: "2 vagas", icon: "parking", amenityId: "parking_space" },
   ]);
 
   const form = new FormData();
@@ -86,15 +85,6 @@ async function updateMultipartProperty(slug, existing) {
   return body.data;
 }
 
-async function getStoredFeatures(slug) {
-  const dbPath = join(__dirname, "..", "data", "lotus.db");
-  // Use API GET and compare - stored features are normalized on read
-  // Instead verify via raw fetch + separate stored check from create response flow
-  const res = await fetch(`${API}/api/properties/${slug}`);
-  const body = await res.json();
-  return body.data;
-}
-
 async function deleteProperty(slug) {
   await fetch(`${API}/api/properties/${slug}`, { method: "DELETE" });
 }
@@ -103,18 +93,20 @@ async function main() {
   console.log("Creating property...");
   const created = await createMultipartProperty();
   console.log("Created slug:", created.slug);
-  console.log("Features (display):", created.features.map((f) => f.label).join(", "));
+  console.log("Features (stored):", created.features.map((f) => f.label).join(", "));
 
   assert(created.location === "Jardins, São Paulo - SP", "location mismatch on create");
   assert(created.address === "Jardins, São Paulo - SP", "address should default to location on create");
-  assert(created.features.some((f) => f.label === "Private swimming pool"), "pool display label");
+  assert(created.features.length === 3, "create should keep all 3 sent features");
+  assert(created.features.some((f) => f.label === "Piscina privativa"), "pool label preserved");
+  assert(created.features.some((f) => f.label === "Wi-Fi"), "wifi label preserved");
   assert(created.features.some((f) => f.label === "Sauna privativa"), "custom feature preserved");
   assert(created.condominium === "Condomínio Teste", "condominium on create");
 
   console.log("Updating property...");
   const updated = await updateMultipartProperty(created.slug, created);
   console.log("Updated title:", updated.title);
-  console.log("Features (display):", updated.features.map((f) => f.label).join(", "));
+  console.log("Features (stored):", updated.features.map((f) => f.label).join(", "));
 
   assert(updated.title === "Teste Integração CRUD Atualizado", "title not updated");
   assert(updated.location === "Pinheiros, São Paulo - SP", "location not updated");
@@ -122,10 +114,11 @@ async function main() {
   assert(updated.purpose === "alugar", "purpose not updated");
   assert(updated.propertyType === "Cobertura", "propertyType not updated");
   assert(updated.condominium === undefined, "condominium should be cleared");
-  assert(updated.features.some((f) => f.label === "24-hour security room"), "security amenity");
+  assert(updated.features.length === 3, "update should keep all 3 sent features");
+  assert(updated.features.some((f) => f.label === "Portaria 24h"), "security label preserved");
   assert(!updated.features.some((f) => f.amenityId === "private_pool"), "pool removed after update");
   assert(updated.features.some((f) => f.label === "Sauna privativa"), "custom feature kept");
-  assert(updated.features.some((f) => f.label === "1 parking space"), "parking from count");
+  assert(updated.features.some((f) => f.label === "2 vagas"), "parking label preserved as sent");
 
   console.log("Cleaning up...");
   await deleteProperty(created.slug);

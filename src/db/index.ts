@@ -14,7 +14,6 @@ import {
   rowToProperty,
   type PropertyRow,
 } from "./schema.js";
-import { normalizeKeyFeaturesForStorage } from "../lib/property-features.js";
 import type { CreatePropertyInput, Property, PropertyFeature, PropertyFilters } from "../types/property.js";
 import type { Inquiry } from "../types/inquiry.js";
 import { generateUniqueSlug } from "../lib/slug.js";
@@ -340,8 +339,6 @@ export function markInquiriesAsRead(ids?: number[]): number {
 export function createProperty(input: CreatePropertyInput): Property {
   const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
   const createdAt = currentTimestampIso();
-  const features = normalizeKeyFeaturesForStorage(input.features, input.parking);
-
   const stmt = db.prepare(`
     INSERT INTO properties (
       slug, title, location, address, badge, purpose, property_type, condominium, code,
@@ -371,7 +368,7 @@ export function createProperty(input: CreatePropertyInput): Property {
     input.price,
     input.priceValue,
     JSON.stringify(input.description),
-    JSON.stringify(features),
+    JSON.stringify(input.features ?? []),
     createdAt,
   );
 
@@ -392,8 +389,6 @@ export function updateProperty(slug: string, input: CreatePropertyInput): Proper
   if (!existing) {
     throw new Error("Property not found");
   }
-
-  const features = normalizeKeyFeaturesForStorage(input.features, input.parking);
 
   const stmt = db.prepare(`
     UPDATE properties SET
@@ -436,7 +431,7 @@ export function updateProperty(slug: string, input: CreatePropertyInput): Proper
     input.price,
     input.priceValue,
     JSON.stringify(input.description),
-    JSON.stringify(features),
+    JSON.stringify(input.features ?? []),
     slug,
   );
 

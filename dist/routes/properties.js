@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, getStoredFeaturesBySlug, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { normalizeCondominiumName } from "../lib/condominium.js";
-import { normalizeKeyFeaturesForStorage } from "../lib/property-features.js";
+import { readFeaturesField } from "../lib/parse-features-field.js";
 import { saveUploadedFile } from "../lib/uploads.js";
 const badgeSchema = z.enum(["DESTAQUE", "LANÇAMENTO"]);
 const amenityIdSchema = z.enum([
@@ -107,58 +107,18 @@ function defaultFeatures(parking) {
         },
     ];
 }
-function parseFeaturesFromBody(body, parking = 0, existingFeatures) {
-    const raw = body.features;
-    const fallback = () => existingFeatures
-        ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
+const featureParseOptions = {
+    isValidIcon: (icon) => featureIconSchema.safeParse(icon).success,
+    isValidAmenityId: (id) => amenityIdSchema.safeParse(id).success,
+};
+async function parseFeaturesFromBody(body, parking = 0, existingFeatures) {
+    const fallback = () => existingFeatures && existingFeatures.length > 0
+        ? existingFeatures
         : defaultFeatures(parking);
-    if (raw === undefined || raw === null) {
+    const parsed = await readFeaturesField(body.features, featureParseOptions);
+    if (parsed === null)
         return fallback();
-    }
-    if (Array.isArray(raw)) {
-        if (raw.length === 0)
-            return normalizeKeyFeaturesForStorage([], parking);
-        return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
-    }
-    if (typeof raw !== "string" || !raw.trim()) {
-        return fallback();
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            return fallback();
-        }
-        if (parsed.length === 0) {
-            return normalizeKeyFeaturesForStorage([], parking);
-        }
-        return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
-    }
-    catch {
-        return fallback();
-    }
-}
-function parseFeatureItems(raw) {
-    if (!Array.isArray(raw))
-        return [];
-    return raw
-        .filter((item) => typeof item === "object" && item !== null && "label" in item && "icon" in item)
-        .map((item) => {
-        const amenityIdRaw = item.amenityId;
-        const amenityId = typeof amenityIdRaw === "string" && amenityIdSchema.safeParse(amenityIdRaw).success
-            ? amenityIdRaw
-            : undefined;
-        return {
-            label: String(item.label).trim(),
-            icon: String(item.icon).trim(),
-            amenityId,
-        };
-    })
-        .filter((item) => item.label.length > 0 && featureIconSchema.safeParse(item.icon).success)
-        .map((item) => ({
-        label: item.label,
-        icon: item.icon,
-        ...(item.amenityId ? { amenityId: item.amenityId } : {}),
-    }));
+    return parsed;
 }
 function asFile(value) {
     return value instanceof File && value.size > 0 ? value : undefined;
@@ -260,7 +220,7 @@ async function parsePropertyMultipart(body, options) {
             price: formatBrazilianPrice(priceValue),
             priceValue,
             description: toDescriptionArray(descriptionRaw),
-            features: parseFeaturesFromBody(body, parking, options?.existingFeatures),
+            features: await parseFeaturesFromBody(body, parking, options?.existingFeatures),
         },
     };
 }
@@ -332,9 +292,7 @@ propertiesRouter.post("/", async (c) => {
             price: data.price ?? formatBrazilianPrice(priceValue),
             priceValue,
             description: toDescriptionArray(data.description),
-            features: data.features
-                ? normalizeKeyFeaturesForStorage(data.features, data.parking)
-                : defaultFeatures(data.parking),
+            features: data.features ?? defaultFeatures(data.parking),
         });
         return c.json({ data: property }, 201);
     }

@@ -1,5 +1,13 @@
-import { normalizeKeyFeaturesForDisplay } from "../lib/property-features.js";
 import { storedTimestampToIso } from "../lib/time.js";
+function parseStoredFeatures(raw) {
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    }
+    catch {
+        return [];
+    }
+}
 export function rowToProperty(row) {
     return {
         slug: row.slug,
@@ -20,7 +28,7 @@ export function rowToProperty(row) {
         price: row.price,
         priceValue: row.price_value,
         description: JSON.parse(row.description),
-        features: normalizeKeyFeaturesForDisplay(JSON.parse(row.features), row.parking),
+        features: parseStoredFeatures(row.features),
         createdAt: storedTimestampToIso(row.created_at) ?? new Date(0).toISOString(),
     };
 }

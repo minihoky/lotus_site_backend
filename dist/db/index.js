@@ -3,7 +3,6 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CREATE_INQUIRIES_TABLE, CREATE_PROPERTIES_TABLE, MIGRATE_INQUIRIES_READ_AT, MIGRATE_PROPERTIES_CODE, MIGRATE_PROPERTIES_CONDOMINIUM, MIGRATE_PROPERTIES_CREATED_AT, MIGRATE_PROPERTIES_PROPERTY_TYPE, MIGRATE_PROPERTIES_SEARCH_FIELDS, rowToProperty, } from "./schema.js";
-import { normalizeKeyFeaturesForStorage } from "../lib/property-features.js";
 import { generateUniqueSlug } from "../lib/slug.js";
 import { currentTimestampIso, storedTimestampToIso } from "../lib/time.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -222,7 +221,6 @@ export function markInquiriesAsRead(ids) {
 export function createProperty(input) {
     const slug = generateUniqueSlug(input.title, (candidate) => Boolean(getPropertyBySlug(candidate)));
     const createdAt = currentTimestampIso();
-    const features = normalizeKeyFeaturesForStorage(input.features, input.parking);
     const stmt = db.prepare(`
     INSERT INTO properties (
       slug, title, location, address, badge, purpose, property_type, condominium, code,
@@ -232,7 +230,7 @@ export function createProperty(input) {
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
     )
   `);
-    stmt.run(slug, input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.purpose ?? "comprar", input.propertyType ?? "Apartamento", input.condominium ?? null, input.code ?? null, input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(features), createdAt);
+    stmt.run(slug, input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.purpose ?? "comprar", input.propertyType ?? "Apartamento", input.condominium ?? null, input.code ?? null, input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(input.features ?? []), createdAt);
     const created = getPropertyBySlug(slug);
     if (!created) {
         throw new Error("Failed to create property");
@@ -248,7 +246,6 @@ export function updateProperty(slug, input) {
     if (!existing) {
         throw new Error("Property not found");
     }
-    const features = normalizeKeyFeaturesForStorage(input.features, input.parking);
     const stmt = db.prepare(`
     UPDATE properties SET
       title = ?,
@@ -271,7 +268,7 @@ export function updateProperty(slug, input) {
       features = ?
     WHERE slug = ?
   `);
-    stmt.run(input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.purpose ?? "comprar", input.propertyType ?? "Apartamento", input.condominium ?? null, input.code ?? null, input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(features), slug);
+    stmt.run(input.title, input.location, input.address, input.badge ?? "DESTAQUE", input.purpose ?? "comprar", input.propertyType ?? "Apartamento", input.condominium ?? null, input.code ?? null, input.image, JSON.stringify(input.gallery), input.beds, input.baths, input.parking, input.area, input.price, input.priceValue, JSON.stringify(input.description), JSON.stringify(input.features ?? []), slug);
     const updated = getPropertyBySlug(slug);
     if (!updated) {
         throw new Error("Failed to update property");

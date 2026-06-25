@@ -1,6 +1,14 @@
 import type { Property, PropertyFeature } from "../types/property.js";
-import { normalizeKeyFeaturesForDisplay } from "../lib/property-features.js";
 import { storedTimestampToIso } from "../lib/time.js";
+
+function parseStoredFeatures(raw: string): PropertyFeature[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as PropertyFeature[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export type PropertyRow = {
   slug: string;
@@ -56,10 +64,7 @@ export function rowToProperty(row: PropertyRow): Property {
     price: row.price,
     priceValue: row.price_value,
     description: JSON.parse(row.description) as string[],
-    features: normalizeKeyFeaturesForDisplay(
-      JSON.parse(row.features) as PropertyFeature[],
-      row.parking,
-    ),
+    features: parseStoredFeatures(row.features),
     createdAt: storedTimestampToIso(row.created_at) ?? new Date(0).toISOString(),
   };
 }
