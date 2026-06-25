@@ -355,6 +355,9 @@ propertiesRouter.put("/:slug", async (c) => {
     }
 
     const body = await c.req.parseBody({ all: true });
+
+    console.log(body, "/// body here");
+    
     
     const parsed = await parsePropertyMultipart(body as Record<string, unknown>, {
       requireImages: false,
