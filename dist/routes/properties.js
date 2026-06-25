@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
+import { createProperty, deleteProperty, getPropertyBySlug, getSimilarProperties, getStoredFeaturesBySlug, listCondominiums, listProperties, listRecentProperties, updateProperty } from "../db/index.js";
 import { formatBrazilianPrice, parseBrazilianPrice } from "../lib/price.js";
 import { normalizeCondominiumName } from "../lib/condominium.js";
 import { normalizeKeyFeaturesForStorage } from "../lib/property-features.js";
@@ -96,20 +96,28 @@ function toDescriptionArray(description) {
         .map((paragraph) => paragraph.trim())
         .filter(Boolean);
 }
-function emptyFeatures() {
-    return [];
+function defaultFeatures(parking) {
+    if (parking <= 0)
+        return [];
+    return [
+        {
+            label: parking === 1 ? "1 vaga" : `${parking} vagas`,
+            icon: "parking",
+            amenityId: "parking_space",
+        },
+    ];
 }
 function parseFeaturesFromBody(body, parking = 0, existingFeatures) {
     const raw = body.features;
     const fallback = () => existingFeatures
         ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
-        : emptyFeatures();
+        : defaultFeatures(parking);
     if (raw === undefined || raw === null) {
         return fallback();
     }
     if (Array.isArray(raw)) {
         if (raw.length === 0)
-            return emptyFeatures();
+            return normalizeKeyFeaturesForStorage([], parking);
         return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
     }
     if (typeof raw !== "string" || !raw.trim()) {
@@ -121,7 +129,7 @@ function parseFeaturesFromBody(body, parking = 0, existingFeatures) {
             return fallback();
         }
         if (parsed.length === 0) {
-            return emptyFeatures();
+            return normalizeKeyFeaturesForStorage([], parking);
         }
         return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
     }
@@ -324,7 +332,9 @@ propertiesRouter.post("/", async (c) => {
             price: data.price ?? formatBrazilianPrice(priceValue),
             priceValue,
             description: toDescriptionArray(data.description),
-            features: data.features ?? emptyFeatures(),
+            features: data.features
+                ? normalizeKeyFeaturesForStorage(data.features, data.parking)
+                : defaultFeatures(data.parking),
         });
         return c.json({ data: property }, 201);
     }
@@ -347,7 +357,7 @@ propertiesRouter.put("/:slug", async (c) => {
         const body = await c.req.parseBody({ all: true });
         const parsed = await parsePropertyMultipart(body, {
             requireImages: false,
-            existingFeatures: existing.features,
+            existingFeatures: getStoredFeaturesBySlug(slug),
         });
         if ("error" in parsed) {
             return c.json({ error: "Validation failed", details: { fieldErrors: parsed.error } }, 400);
@@ -360,12 +370,13 @@ propertiesRouter.put("/:slug", async (c) => {
         }
         const hasAddressField = typeof body.address === "string" && body.address.trim().length > 0;
         const hasCondominiumField = body.condominium !== undefined;
+        const hasCodeField = body.code !== undefined;
         const property = updateProperty(slug, {
             ...parsed.data,
             image: parsed.data.image,
             badge: parsed.data.badge ?? existing.badge,
-            address: hasAddressField ? parsed.data.address : existing.address,
-            code: parsed.data.code ?? existing.code,
+            address: hasAddressField ? parsed.data.address : parsed.data.location,
+            code: hasCodeField ? parsed.data.code : existing.code,
             condominium: hasCondominiumField ? parsed.data.condominium : existing.condominium,
         });
         return c.json({ data: property });

@@ -1,24 +1,32 @@
 import type { PropertyAmenityId, PropertyFeature, PropertyFeatureIcon } from "../types/property.js";
 
-type KeyFeatureCatalogEntry = {
+type AmenityCatalogEntry = {
   id: PropertyAmenityId;
   label: string;
+  pageLabel: string;
   icon: PropertyFeatureIcon;
 };
 
-export const KEY_FEATURE_CATALOG: KeyFeatureCatalogEntry[] = [
-  { id: "private_pool", label: "Private swimming pool", icon: "pool" },
-  { id: "terrace", label: "Terrace", icon: "balcony" },
-  { id: "security_24h", label: "24-hour security room", icon: "security" },
-  { id: "air_conditioning", label: "Heating and cooling", icon: "ac" },
-  { id: "private_beach", label: "Private beach", icon: "beach" },
-  { id: "marina", label: "Marina", icon: "marina" },
-  { id: "wifi", label: "Wi-Fi", icon: "wifi" },
-  { id: "parking_space", label: "Parking", icon: "parking" },
+export const AMENITY_CATALOG: AmenityCatalogEntry[] = [
+  { id: "private_pool", label: "Piscina privativa", pageLabel: "Private swimming pool", icon: "pool" },
+  { id: "terrace", label: "Terraço", pageLabel: "Terrace", icon: "balcony" },
+  { id: "security_24h", label: "Portaria 24h", pageLabel: "24-hour security room", icon: "security" },
+  { id: "air_conditioning", label: "Ar condicionado", pageLabel: "Heating and cooling", icon: "ac" },
+  { id: "private_beach", label: "Praia privativa", pageLabel: "Private beach", icon: "beach" },
+  { id: "marina", label: "Marina", pageLabel: "Marina", icon: "marina" },
+  { id: "wifi", label: "Wi-Fi", pageLabel: "Wi-Fi", icon: "wifi" },
+  { id: "parking_space", label: "Vaga de estacionamento", pageLabel: "Parking", icon: "parking" },
 ];
 
-const CATALOG_BY_ID = new Map(KEY_FEATURE_CATALOG.map((entry) => [entry.id, entry]));
-const CATALOG_ID_SET = new Set<PropertyAmenityId>(KEY_FEATURE_CATALOG.map((entry) => entry.id));
+/** @deprecated Use AMENITY_CATALOG */
+export const KEY_FEATURE_CATALOG = AMENITY_CATALOG.map(({ id, pageLabel, icon }) => ({
+  id,
+  label: pageLabel,
+  icon,
+}));
+
+const AMENITY_BY_ID = new Map(AMENITY_CATALOG.map((amenity) => [amenity.id, amenity]));
+const AMENITY_ID_SET = new Set<PropertyAmenityId>(AMENITY_CATALOG.map((amenity) => amenity.id));
 
 const VALID_ICONS = new Set<PropertyFeatureIcon>([
   "pool",
@@ -38,33 +46,35 @@ const VALID_ICONS = new Set<PropertyFeatureIcon>([
 const LABEL_ALIASES: Partial<Record<PropertyAmenityId, RegExp[]>> = {
   private_pool: [/piscina/i, /swimming\s*pool/i, /private\s*pool/i],
   terrace: [/terra[cç]o/i, /terrace/i, /varanda/i, /balcon/i],
-  security_24h: [/portaria/i, /seguran[cç]a/i, /24[\s-]*hour/i, /24\s*h/i, /security/i],
-  air_conditioning: [/ar\s*condicionado/i, /air\s*conditioning/i, /heating/i, /cooling/i, /\bac\b/i],
+  security_24h: [/portaria/i, /seguran[cç]a/i, /24\s*h/i, /security/i],
+  air_conditioning: [/ar\s*condicionado/i, /air\s*conditioning/i, /\bac\b/i],
   private_beach: [/praia/i, /private\s*beach/i, /beach/i],
   marina: [/marina/i],
-  wifi: [/wi[\s-]?fi/i, /coworking/i],
+  wifi: [/wi[\s-]?fi/i],
   parking_space: [/vaga/i, /estacionamento/i, /parking/i],
 };
 
 function sortAmenityIds(ids: PropertyAmenityId[]): PropertyAmenityId[] {
   const selected = new Set(ids);
-  return KEY_FEATURE_CATALOG.filter((entry) => selected.has(entry.id)).map((entry) => entry.id);
+  return AMENITY_CATALOG.filter((amenity) => selected.has(amenity.id)).map((amenity) => amenity.id);
 }
 
 function amenityIdForFeature(feature: PropertyFeature): PropertyAmenityId | undefined {
-  if (feature.amenityId && CATALOG_ID_SET.has(feature.amenityId)) {
+  if (feature.amenityId && AMENITY_ID_SET.has(feature.amenityId)) {
     return feature.amenityId;
   }
 
-  const byLabel = KEY_FEATURE_CATALOG.find(
-    (entry) => entry.label.toLowerCase() === feature.label.toLowerCase(),
+  const byLabel = AMENITY_CATALOG.find(
+    (amenity) =>
+      amenity.label.toLowerCase() === feature.label.toLowerCase() ||
+      amenity.pageLabel.toLowerCase() === feature.label.toLowerCase(),
   );
   if (byLabel) return byLabel.id;
 
-  for (const entry of KEY_FEATURE_CATALOG) {
-    const aliases = LABEL_ALIASES[entry.id];
+  for (const amenity of AMENITY_CATALOG) {
+    const aliases = LABEL_ALIASES[amenity.id];
     if (aliases?.some((pattern) => pattern.test(feature.label))) {
-      return entry.id;
+      return amenity.id;
     }
   }
 
@@ -72,7 +82,7 @@ function amenityIdForFeature(feature: PropertyFeature): PropertyAmenityId | unde
     return "parking_space";
   }
 
-  return KEY_FEATURE_CATALOG.find((entry) => entry.icon === feature.icon)?.id;
+  return AMENITY_CATALOG.find((amenity) => amenity.icon === feature.icon)?.id;
 }
 
 function featuresToAmenityIds(features: PropertyFeature[]): PropertyAmenityId[] {
@@ -82,11 +92,6 @@ function featuresToAmenityIds(features: PropertyFeature[]): PropertyAmenityId[] 
     if (id) ids.add(id);
   }
   return sortAmenityIds([...ids]);
-}
-
-function parkingLabel(parking: number): string {
-  if (parking === 1) return "1 parking space";
-  return `${parking} parking spaces`;
 }
 
 function dedupeFeatures(features: PropertyFeature[]): PropertyFeature[] {
@@ -105,7 +110,7 @@ function dedupeFeatures(features: PropertyFeature[]): PropertyFeature[] {
 
 export function extractCustomFeatures(features: PropertyFeature[]): PropertyFeature[] {
   return dedupeFeatures(
-    features.filter(
+    (features ?? []).filter(
       (feature) =>
         VALID_ICONS.has(feature.icon) &&
         feature.label.trim().length > 0 &&
@@ -114,54 +119,139 @@ export function extractCustomFeatures(features: PropertyFeature[]): PropertyFeat
   );
 }
 
-function normalizeCatalogFeaturesForDisplay(
+function catalogFeaturesForDisplay(
   features: PropertyFeature[],
   parking = 0,
+  options?: { usePageLabels?: boolean },
 ): PropertyFeature[] {
   const ids = featuresToAmenityIds(features);
   if (ids.length === 0) return [];
 
-  return ids.map((id) => {
-    const entry = CATALOG_BY_ID.get(id)!;
+  const usePageLabels = options?.usePageLabels ?? true;
+
+  return sortAmenityIds(ids).map((id) => {
+    const amenity = AMENITY_BY_ID.get(id)!;
 
     if (id === "parking_space" && parking > 0) {
       return {
-        label: parkingLabel(parking),
-        icon: entry.icon,
+        label: usePageLabels
+          ? parking === 1
+            ? "1 parking space"
+            : `${parking} parking spaces`
+          : parking === 1
+            ? "1 vaga"
+            : `${parking} vagas`,
+        icon: "parking",
         amenityId: id,
       };
     }
 
     return {
-      label: entry.label,
-      icon: entry.icon,
+      label: usePageLabels ? amenity.pageLabel : amenity.label,
+      icon: amenity.icon,
       amenityId: id,
     };
   });
+}
+
+function allFeaturesForDisplay(
+  features: PropertyFeature[],
+  parking = 0,
+  options?: { usePageLabels?: boolean },
+): PropertyFeature[] {
+  const usePageLabels = options?.usePageLabels ?? true;
+  const catalog = catalogFeaturesForDisplay(features, parking, options);
+  const custom = extractCustomFeatures(features).map((feature) => ({
+    label: feature.label.trim(),
+    icon: feature.icon,
+  }));
+
+  const merged = dedupeFeatures([...catalog, ...custom]);
+
+  if (parking > 0 && !hasParkingFeature(merged)) {
+    return dedupeFeatures([...merged, parkingFeatureForDisplay(parking, usePageLabels)]);
+  }
+
+  return merged;
+}
+
+function amenitiesToFeatures(selectedIds: PropertyAmenityId[], parking = 0): PropertyFeature[] {
+  return sortAmenityIds(selectedIds).map((id) => {
+    const amenity = AMENITY_BY_ID.get(id)!;
+
+    if (id === "parking_space" && parking > 0) {
+      return parkingFeatureForStorage(parking);
+    }
+
+    return {
+      label: amenity.label,
+      icon: amenity.icon,
+      amenityId: id,
+    };
+  });
+}
+
+function parkingFeatureForStorage(parking: number): PropertyFeature {
+  return {
+    label: parking === 1 ? "1 vaga" : `${parking} vagas`,
+    icon: "parking",
+    amenityId: "parking_space",
+  };
+}
+
+function parkingFeatureForDisplay(parking: number, usePageLabels = true): PropertyFeature {
+  return {
+    label: usePageLabels
+      ? parking === 1
+        ? "1 parking space"
+        : `${parking} parking spaces`
+      : parking === 1
+        ? "1 vaga"
+        : `${parking} vagas`,
+    icon: "parking",
+    amenityId: "parking_space",
+  };
+}
+
+function hasParkingFeature(features: PropertyFeature[]): boolean {
+  return features.some(
+    (feature) => feature.amenityId === "parking_space" || feature.icon === "parking",
+  );
+}
+
+function mergeFeaturesForStorage(
+  catalogFeatures: PropertyFeature[],
+  customFeatures: PropertyFeature[],
+  parking = 0,
+): PropertyFeature[] {
+  const custom = customFeatures
+    .map((feature) => ({
+      label: feature.label.trim(),
+      icon: feature.icon,
+    }))
+    .filter((feature) => feature.label.length > 0 && VALID_ICONS.has(feature.icon));
+
+  const catalog = [...catalogFeatures];
+  if (parking > 0 && !hasParkingFeature([...catalog, ...custom])) {
+    catalog.unshift(parkingFeatureForStorage(parking));
+  }
+
+  return dedupeFeatures([...catalog, ...custom]);
 }
 
 export function normalizeKeyFeaturesForDisplay(
   features: PropertyFeature[],
   parking = 0,
 ): PropertyFeature[] {
-  const catalog = normalizeCatalogFeaturesForDisplay(features, parking);
-  const custom = extractCustomFeatures(features).map((feature) => ({
-    label: feature.label.trim(),
-    icon: feature.icon,
-  }));
-
-  return dedupeFeatures([...catalog, ...custom]);
+  return allFeaturesForDisplay(features, parking, { usePageLabels: true });
 }
 
 export function normalizeKeyFeaturesForStorage(
   features: PropertyFeature[],
   parking = 0,
 ): PropertyFeature[] {
-  const catalog = normalizeCatalogFeaturesForDisplay(features, parking);
-  const custom = extractCustomFeatures(features).map((feature) => ({
-    label: feature.label.trim(),
-    icon: feature.icon,
-  }));
-
-  return dedupeFeatures([...catalog, ...custom]);
+  const amenityIds = featuresToAmenityIds(features);
+  const catalogFeatures = amenitiesToFeatures(amenityIds, parking);
+  const customFeatures = extractCustomFeatures(features);
+  return mergeFeaturesForStorage(catalogFeatures, customFeatures, parking);
 }

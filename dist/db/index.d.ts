@@ -1,11 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
-import type { CreatePropertyInput, Property, PropertyFilters } from "../types/property.js";
+import type { CreatePropertyInput, Property, PropertyFeature, PropertyFilters } from "../types/property.js";
 import type { Inquiry } from "../types/inquiry.js";
 declare const db: DatabaseSync;
 export declare function listProperties(filters?: PropertyFilters): Property[];
 export declare function listRecentProperties(limit?: number): Property[];
 export declare function listCondominiums(): string[];
 export declare function getPropertyBySlug(slug: string): Property | undefined;
+export declare function getStoredFeaturesBySlug(slug: string): PropertyFeature[];
 export declare function getSimilarProperties(slug: string, limit?: number): Property[];
 export declare function createInquiry(input: {
     propertySlug?: string;
