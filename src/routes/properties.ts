@@ -150,13 +150,8 @@ function parseFeatureItems(raw: unknown): PropertyFeature[] {
 function parseFeaturesFromBody(
   body: Record<string, unknown>,
   parking = 0,
-  existingFeatures?: PropertyFeature[],
 ): PropertyFeature[] {
   const raw = body.features;
-  const fallback = () =>
-    existingFeatures
-      ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
-      : defaultFeatures(parking);
 
   if (Array.isArray(raw)) {
     if (raw.length === 0) return defaultFeatures(parking);
@@ -164,13 +159,13 @@ function parseFeaturesFromBody(
   }
 
   if (typeof raw !== "string" || !raw.trim()) {
-    return fallback();
+    return defaultFeatures(parking);
   }
 
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) {
-      return fallback();
+      return defaultFeatures(parking);
     }
 
     if (parsed.length === 0) {
@@ -179,7 +174,7 @@ function parseFeaturesFromBody(
 
     return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
   } catch {
-    return fallback();
+    return defaultFeatures(parking);
   }
 }
 
@@ -209,10 +204,7 @@ function asStringArray(value: unknown): string[] {
   return [];
 }
 
-async function parsePropertyMultipart(
-  body: Record<string, unknown>,
-  options?: { requireImages?: boolean; existingFeatures?: PropertyFeature[] },
-) {
+async function parsePropertyMultipart(body: Record<string, unknown>, options?: { requireImages?: boolean }) {
   const requireImages = options?.requireImages ?? true;
 
   const title = String(body.title ?? "").trim();
@@ -288,7 +280,7 @@ async function parsePropertyMultipart(
       price: formatBrazilianPrice(priceValue),
       priceValue,
       description: toDescriptionArray(descriptionRaw),
-      features: parseFeaturesFromBody(body, parking, options?.existingFeatures),
+      features: parseFeaturesFromBody(body, parking),
     },
   };
 }
@@ -386,8 +378,7 @@ propertiesRouter.post("/", async (c) => {
 
 propertiesRouter.put("/:slug", async (c) => {
   const slug = c.req.param("slug");
-  const existing = getPropertyBySlug(slug);
-  if (!existing) {
+  if (!getPropertyBySlug(slug)) {
     return c.json({ error: "Property not found" }, 404);
   }
 
@@ -399,10 +390,7 @@ propertiesRouter.put("/:slug", async (c) => {
     }
 
     const body = await c.req.parseBody({ all: true });
-    const parsed = await parsePropertyMultipart(body as Record<string, unknown>, {
-      requireImages: false,
-      existingFeatures: existing.features,
-    });
+    const parsed = await parsePropertyMultipart(body as Record<string, unknown>, { requireImages: false });
 
     if ("error" in parsed) {
       return c.json({ error: "Validation failed", details: { fieldErrors: parsed.error } }, 400);
@@ -416,16 +404,9 @@ propertiesRouter.put("/:slug", async (c) => {
       return c.json({ error: "Validation failed", details: { fieldErrors: { gallery: ["Adicione pelo menos uma imagem na galeria"] } } }, 400);
     }
 
-    const hasAddressField = typeof body.address === "string" && body.address.trim().length > 0;
-    const hasCondominiumField = body.condominium !== undefined;
-
     const property = updateProperty(slug, {
       ...parsed.data,
       image: parsed.data.image,
-      badge: parsed.data.badge ?? existing.badge,
-      address: hasAddressField ? parsed.data.address : existing.address,
-      code: parsed.data.code ?? existing.code,
-      condominium: hasCondominiumField ? parsed.data.condominium : existing.condominium,
     });
 
     return c.json({ data: property });
