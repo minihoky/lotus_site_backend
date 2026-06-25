@@ -107,15 +107,48 @@ function toDescriptionArray(description: string | string[]): string[] {
     .filter(Boolean);
 }
 
-function defaultFeatures(parking: number): { label: string; icon: PropertyFeatureIcon }[] {
-  const features: { label: string; icon: PropertyFeatureIcon }[] = [];
-  if (parking > 0) {
-    features.push({
-      label: parking === 1 ? "1 vaga" : `${parking} vagas`,
-      icon: "parking",
-    });
+function emptyFeatures(): PropertyFeature[] {
+  return [];
+}
+
+function parseFeaturesFromBody(
+  body: Record<string, unknown>,
+  parking = 0,
+  existingFeatures?: PropertyFeature[],
+): PropertyFeature[] {
+  const raw = body.features;
+  const fallback = () =>
+    existingFeatures
+      ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
+      : emptyFeatures();
+
+  if (raw === undefined || raw === null) {
+    return fallback();
   }
-  return features;
+
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return emptyFeatures();
+    return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
+  }
+
+  if (typeof raw !== "string" || !raw.trim()) {
+    return fallback();
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return fallback();
+    }
+
+    if (parsed.length === 0) {
+      return emptyFeatures();
+    }
+
+    return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
+  } catch {
+    return fallback();
+  }
 }
 
 function parseFeatureItems(raw: unknown): PropertyFeature[] {
@@ -145,46 +178,6 @@ function parseFeatureItems(raw: unknown): PropertyFeature[] {
       icon: item.icon as PropertyFeatureIcon,
       ...(item.amenityId ? { amenityId: item.amenityId } : {}),
     }));
-}
-
-function parseFeaturesFromBody(
-  body: Record<string, unknown>,
-  parking = 0,
-  existingFeatures?: PropertyFeature[],
-): PropertyFeature[] {
-  const raw = body.features;
-  const fallback = () =>
-    existingFeatures
-      ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
-      : defaultFeatures(parking);
-
-  if (raw === undefined || raw === null) {
-    return fallback();
-  }
-
-  if (Array.isArray(raw)) {
-    if (raw.length === 0) return defaultFeatures(parking);
-    return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
-  }
-
-  if (typeof raw !== "string" || !raw.trim()) {
-    return fallback();
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return fallback();
-    }
-
-    if (parsed.length === 0) {
-      return defaultFeatures(parking);
-    }
-
-    return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
-  } catch {
-    return fallback();
-  }
 }
 
 function asFile(value: unknown): File | undefined {
@@ -378,7 +371,7 @@ propertiesRouter.post("/", async (c) => {
       price: data.price ?? formatBrazilianPrice(priceValue),
       priceValue,
       description: toDescriptionArray(data.description),
-      features: data.features ?? defaultFeatures(data.parking),
+      features: data.features ?? emptyFeatures(),
     });
 
     return c.json({ data: property }, 201);

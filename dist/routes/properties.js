@@ -96,15 +96,38 @@ function toDescriptionArray(description) {
         .map((paragraph) => paragraph.trim())
         .filter(Boolean);
 }
-function defaultFeatures(parking) {
-    const features = [];
-    if (parking > 0) {
-        features.push({
-            label: parking === 1 ? "1 vaga" : `${parking} vagas`,
-            icon: "parking",
-        });
+function emptyFeatures() {
+    return [];
+}
+function parseFeaturesFromBody(body, parking = 0, existingFeatures) {
+    const raw = body.features;
+    const fallback = () => existingFeatures
+        ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
+        : emptyFeatures();
+    if (raw === undefined || raw === null) {
+        return fallback();
     }
-    return features;
+    if (Array.isArray(raw)) {
+        if (raw.length === 0)
+            return emptyFeatures();
+        return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
+    }
+    if (typeof raw !== "string" || !raw.trim()) {
+        return fallback();
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return fallback();
+        }
+        if (parsed.length === 0) {
+            return emptyFeatures();
+        }
+        return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
+    }
+    catch {
+        return fallback();
+    }
 }
 function parseFeatureItems(raw) {
     if (!Array.isArray(raw))
@@ -128,36 +151,6 @@ function parseFeatureItems(raw) {
         icon: item.icon,
         ...(item.amenityId ? { amenityId: item.amenityId } : {}),
     }));
-}
-function parseFeaturesFromBody(body, parking = 0, existingFeatures) {
-    const raw = body.features;
-    const fallback = () => existingFeatures
-        ? normalizeKeyFeaturesForStorage(existingFeatures, parking)
-        : defaultFeatures(parking);
-    if (raw === undefined || raw === null) {
-        return fallback();
-    }
-    if (Array.isArray(raw)) {
-        if (raw.length === 0)
-            return defaultFeatures(parking);
-        return normalizeKeyFeaturesForStorage(parseFeatureItems(raw), parking);
-    }
-    if (typeof raw !== "string" || !raw.trim()) {
-        return fallback();
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            return fallback();
-        }
-        if (parsed.length === 0) {
-            return defaultFeatures(parking);
-        }
-        return normalizeKeyFeaturesForStorage(parseFeatureItems(parsed), parking);
-    }
-    catch {
-        return fallback();
-    }
 }
 function asFile(value) {
     return value instanceof File && value.size > 0 ? value : undefined;
@@ -331,7 +324,7 @@ propertiesRouter.post("/", async (c) => {
             price: data.price ?? formatBrazilianPrice(priceValue),
             priceValue,
             description: toDescriptionArray(data.description),
-            features: data.features ?? defaultFeatures(data.parking),
+            features: data.features ?? emptyFeatures(),
         });
         return c.json({ data: property }, 201);
     }
