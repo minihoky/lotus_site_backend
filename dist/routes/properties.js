@@ -313,6 +313,7 @@ propertiesRouter.put("/:slug", async (c) => {
             return c.json({ error: "Content-Type must be multipart/form-data" }, 400);
         }
         const body = await c.req.parseBody({ all: true });
+        console.log(body, "/// body here");
         const parsed = await parsePropertyMultipart(body, {
             requireImages: false,
             existingFeatures: getStoredFeaturesBySlug(slug),
