@@ -16,8 +16,10 @@ else {
     syncPropertySearchMetadata();
 }
 const app = new Hono();
-const API_HOST = process.env.API_HOST ?? "127.0.0.1";
-const API_PORT = Number(process.env.PORT ?? 3001);
+// const API_HOST = process.env.API_HOST ?? "127.0.0.1";
+// const API_PORT = Number(process.env.PORT ?? 3001);
+const API_HOST = process.env.API_HOST ?? "0.0.0.0";
+const API_PORT = Number(process.env.PORT) || 10000;
 const API_ORIGIN = `http://${API_HOST}:${API_PORT}`;
 const allowedOrigins = (process.env.CORS_ORIGINS ??
     [
