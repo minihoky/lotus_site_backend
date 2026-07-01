@@ -35,7 +35,7 @@ const allowedOrigins = (
     "http://localhost:8081",
     "http://127.0.0.1:8080",
     "http://127.0.0.1:8081",
-    "https://lotus-site-frontend-q2tg.vercel.app",
+    // "https://lotus-site-frontend-q2tg.vercel.app",
     // "https://lotus-site-frontend-rm2z.vercel.app",
     // "https://lotus-site-frontend-rm2z.vercel.app",
     API_ORIGIN,
